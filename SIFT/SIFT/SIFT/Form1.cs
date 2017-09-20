@@ -348,15 +348,15 @@ namespace SIFT
             CornerPoint = new int[bitmap.Width, bitmap.Height];
             double[,] tempCornerPoint = new double[bitmap.Width, bitmap.Height];
 
-            for (int i = 1; i < bitmap.Width - sizeOfw; i++)
+            for (int i = 1 + rightPoint; i < bitmap.Width - sizeOfw + rightPoint; i++)
             {
-                for (int j = 1; j < bitmap.Height - sizeOfw; j++)
+                for (int j = 1 + rightPoint; j < bitmap.Height - sizeOfw + rightPoint; j++)
                 {
                     //算Ix,Iy
                     int c = 0;
-                    for (int tempi = 0; tempi < sizeOfw; tempi++)
+                    for (int tempi = -rightPoint; tempi < rightPoint; tempi++)
                     {
-                        for (int tempj = 0; tempj < sizeOfw; tempj++)
+                        for (int tempj = -rightPoint; tempj < rightPoint; tempj++)
                         {
                             double Ix, Iy;
                             int nowi = i + tempi, nowj = j + tempj;
@@ -376,8 +376,8 @@ namespace SIFT
                         }
                     }
                     //計算det( = )與trace( = Ix^2 + Iy^2)
-                    det[i,j] = M[i,j,0, 0] * M[i,j,1, 1] - M[i,j,0, 1] * M[i,j,1, 0];
-                    trace[i, j] = M[i,j,0, 0] + M[i,j,1, 1];
+                    det[i, j] = M[i, j, 0, 0] * M[i, j, 1, 1] - M[i, j, 0, 1] * M[i, j, 1, 0];
+                    trace[i, j] = M[i, j, 0, 0] + M[i, j, 1, 1];
 
                     //計算R,浪打1,浪打2
                     lambda2 = (trace[i, j] + Math.Sqrt(trace[i, j] * trace[i, j] - 4 * det[i, j])) / 2;
@@ -391,7 +391,7 @@ namespace SIFT
                     // && smallLambda / bigLambda > 0.95
                     //if (smallLambda > minLambda)
                     if (R[i, j] > minLambda)
-                        tempCornerPoint[i + rightPoint, j + rightPoint] = R[i, j];
+                        tempCornerPoint[i, j] = R[i, j];
                 }
             }
 
