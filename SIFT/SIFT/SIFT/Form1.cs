@@ -24,6 +24,8 @@ namespace SIFT
         double minLambda = 0, k;
         int[,] CornerPoint;
         int sizeOfw = 7;//找角落時的方格大小
+        double[,] R, det, trace, smallLambda, bigLambda,IxB,IyB;
+        double[,,,] M;
 
         public Form1()
         {
@@ -331,8 +333,16 @@ namespace SIFT
         {
             //找角落
             minLambda = double.Parse(textBox2.Text); //最小浪打值
-            double R;
-            double det, trace, smallLambda, bigLambda, lambda1, lambda2;
+            M = new double[bitmap.Width, bitmap.Height, 2, 2];
+            det = new double[bitmap.Width, bitmap.Height];
+            trace = new double[bitmap.Width, bitmap.Height];
+            R = new double[bitmap.Width, bitmap.Height];
+            IxB = new double[bitmap.Width, bitmap.Height];
+            IyB = new double[bitmap.Width, bitmap.Height];
+            bigLambda = new double[bitmap.Width, bitmap.Height];
+            smallLambda = new double[bitmap.Width, bitmap.Height];
+
+            double lambda1, lambda2;
             int rightPoint = sizeOfw / 2 - 1;
             CornerPoint = new int[bitmap.Width, bitmap.Height];
             double[,] tempCornerPoint = new double[bitmap.Width, bitmap.Height];
@@ -342,7 +352,6 @@ namespace SIFT
                 for (int j = 1; j < bitmap.Height - sizeOfw; j++)
                 {
                     //算Ix,Iy
-                    double[,] M = new double[2, 2];
                     for (int tempi = 0; tempi < sizeOfw; tempi++)
                     {
                         for (int tempj = 0; tempj < sizeOfw; tempj++)
@@ -355,29 +364,31 @@ namespace SIFT
                             Ix /= 255;
                             Iy /= 255;
                             //將值加總進陣列M
-                            M[0, 0] += Ix * Ix * imageGray[nowi, nowj] / (sizeOfw * sizeOfw);
-                            M[0, 1] += Ix * Iy * imageGray[nowi, nowj] / (sizeOfw * sizeOfw);
-                            M[1, 0] = M[0, 1];
-                            M[1, 1] += Iy * Iy * imageGray[nowi, nowj] / (sizeOfw * sizeOfw);
+                            M[i, j, 0, 0] += Ix * Ix * imageGray[nowi, nowj] / (sizeOfw * sizeOfw);
+                            M[i, j, 0, 1] += Ix * Iy * imageGray[nowi, nowj] / (sizeOfw * sizeOfw);
+                            M[i, j, 1, 0] = M[i, j, 0, 1];
+                            M[i, j, 1, 1] += Iy * Iy * imageGray[nowi, nowj] / (sizeOfw * sizeOfw);
+                            IxB[i,j] = Ix;
+                            IyB[i,j] = Iy;
                         }
                     }
                     //計算det( = )與trace( = Ix^2 + Iy^2)
-                    det = M[0, 0] * M[1, 1] - M[0, 1] * M[1, 0];
-                    trace = M[0, 0] + M[1, 1];
+                    det[i,j] = M[i,j,0, 0] * M[i,j,1, 1] - M[i,j,0, 1] * M[i,j,1, 0];
+                    trace[i, j] = M[i,j,0, 0] + M[i,j,1, 1];
 
                     //計算R,浪打1,浪打2
-                    lambda2 = (trace + Math.Sqrt(trace * trace - 4 * det)) / 2;
-                    lambda1 = (trace - Math.Sqrt(trace * trace - 4 * det)) / 2;
-                    R = det - k * trace * trace;
+                    lambda2 = (trace[i, j] + Math.Sqrt(trace[i, j] * trace[i, j] - 4 * det[i, j])) / 2;
+                    lambda1 = (trace[i, j] - Math.Sqrt(trace[i, j] * trace[i, j] - 4 * det[i, j])) / 2;
+                    R[i, j] = det[i, j] - k * trace[i, j] * trace[i, j];
 
                     //找兩個浪打間的最小值
                     //lambda(max) / lambda(min) > 0.8 ?
-                    smallLambda = lambda1 < lambda2 ? lambda1 : lambda2;
-                    bigLambda = lambda1 > lambda2 ? lambda1 : lambda2;
+                    smallLambda[i, j] = lambda1 < lambda2 ? lambda1 : lambda2;
+                    bigLambda[i, j] = lambda1 > lambda2 ? lambda1 : lambda2;
                     // && smallLambda / bigLambda > 0.95
                     //if (smallLambda > minLambda)
-                    if (R > minLambda)
-                        tempCornerPoint[i + rightPoint, j + rightPoint] = R;
+                    if (R[i, j] > minLambda)
+                        tempCornerPoint[i + rightPoint, j + rightPoint] = R[i, j];
                 }
             }
 
