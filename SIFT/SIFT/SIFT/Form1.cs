@@ -24,7 +24,8 @@ namespace SIFT
         double minLambda = 0, k;
         int[,] CornerPoint;
         int sizeOfw = 7;//找角落時的方格大小
-        double[,] R, det, trace, smallLambda, bigLambda,IxB,IyB;
+        double[,] R, det, trace, smallLambda, bigLambda;
+        double[,,] IxB, IyB;
         double[,,,] M;
 
         public Form1()
@@ -337,8 +338,8 @@ namespace SIFT
             det = new double[bitmap.Width, bitmap.Height];
             trace = new double[bitmap.Width, bitmap.Height];
             R = new double[bitmap.Width, bitmap.Height];
-            IxB = new double[bitmap.Width, bitmap.Height];
-            IyB = new double[bitmap.Width, bitmap.Height];
+            IxB = new double[bitmap.Width, bitmap.Height, sizeOfw * sizeOfw];
+            IyB = new double[bitmap.Width, bitmap.Height, sizeOfw * sizeOfw];
             bigLambda = new double[bitmap.Width, bitmap.Height];
             smallLambda = new double[bitmap.Width, bitmap.Height];
 
@@ -352,6 +353,7 @@ namespace SIFT
                 for (int j = 1; j < bitmap.Height - sizeOfw; j++)
                 {
                     //算Ix,Iy
+                    int c = 0;
                     for (int tempi = 0; tempi < sizeOfw; tempi++)
                     {
                         for (int tempj = 0; tempj < sizeOfw; tempj++)
@@ -368,8 +370,9 @@ namespace SIFT
                             M[i, j, 0, 1] += Ix * Iy * imageGray[nowi, nowj] / (sizeOfw * sizeOfw);
                             M[i, j, 1, 0] = M[i, j, 0, 1];
                             M[i, j, 1, 1] += Iy * Iy * imageGray[nowi, nowj] / (sizeOfw * sizeOfw);
-                            IxB[i,j] = Ix;
-                            IyB[i,j] = Iy;
+                            IxB[i, j, c] = Ix;
+                            IyB[i, j, c] = Iy;
+                            c++;
                         }
                     }
                     //計算det( = )與trace( = Ix^2 + Iy^2)
@@ -459,65 +462,31 @@ namespace SIFT
         private void show_Click(object sender, EventArgs e)
         {
             //show出一些需要的資訊//算Ix,Iy
-            int x, y, c = 0;
+            int x, y;
             x = int.Parse(textBox4.Text);
-            y = int.Parse(textBox5.Text);
+            y = int.Parse(textBox5.Text);/*
             double det, trace, lambda1, lambda2, R, bigLambda, smallLambda;
             double[,] M = new double[2, 2];
             double[] IxB = new double[sizeOfw * sizeOfw];
-            double[] IyB = new double[sizeOfw * sizeOfw];
+            double[] IyB = new double[sizeOfw * sizeOfw];*/
             string str = "Ix,Iy:";
 
-
-            for (int tempi = 0; tempi < sizeOfw; tempi++)
-            {
-                for (int tempj = 0; tempj < sizeOfw; tempj++)
-                {
-                    double Ix, Iy;
-                    int nowi = x + tempi, nowj = y + tempj;
-                    //分別對x,y微分出Ix,Iy
-                    Ix = imageGray[nowi + 1, nowj - 1] + 2 * imageGray[nowi + 1, nowj] + imageGray[nowi + 1, nowj + 1] - imageGray[nowi - 1, nowj - 1] - 2 * imageGray[nowi - 1, nowj] - imageGray[nowi - 1, nowj + 1];
-                    Iy = imageGray[nowi - 1, nowj + 1] + 2 * imageGray[nowi, nowj + 1] + imageGray[nowi + 1, nowj + 1] - imageGray[nowi - 1, nowj - 1] - 2 * imageGray[nowi, nowj - 1] - imageGray[nowi + 1, nowj - 1];
-                    Ix /= 255;
-                    Iy /= 255;
-                    //將值加總進陣列M
-                    M[0, 0] += Ix * Ix * imageGray[nowi, nowj] / (sizeOfw * sizeOfw);
-                    M[0, 1] += Ix * Iy * imageGray[nowi, nowj] / (sizeOfw * sizeOfw);
-                    M[1, 0] = M[0, 1];
-                    M[1, 1] += Iy * Iy * imageGray[nowi, nowj] / (sizeOfw * sizeOfw);
-                    IxB[c] = Ix;
-                    IyB[c] = Iy;
-                    c++;
-                }
-            }
-            //計算det( = )與trace( = Ix^2 + Iy^2)
-            det = M[0, 0] * M[1, 1] - M[0, 1] * M[1, 0];
-            trace = M[0, 0] + M[1, 1];
-
-            //計算R,浪打1,浪打2
-            lambda2 = (trace + Math.Sqrt(trace * trace - 4 * det)) / 2;
-            lambda1 = (trace - Math.Sqrt(trace * trace - 4 * det)) / 2;
-            R = det - k * trace * trace;
-
-            //找兩個浪打間的最小值
-            smallLambda = lambda1 < lambda2 ? lambda1 : lambda2;
-            bigLambda = lambda1 > lambda2 ? lambda1 : lambda2;
             
-            for(int i = 0; i < c; i++)
+            for(int i = 0; i < sizeOfw * sizeOfw; i++)
             {
                 if (i % sizeOfw == 0)
                     str += "\n";
 
-                int tmp = (int)(IxB[i] * 1000);
-                IxB[i] = (double)tmp / 1000;
-                tmp = (int)(IyB[i] * 1000);
-                IyB[i] = (double)tmp / 1000;
-                str += "(" + IxB[i] + ", " + IyB[i] + ")   ";
+                int tmp = (int)(IxB[x, y, i] * 1000);
+                IxB[x, y, i] = (double)tmp / 1000;
+                tmp = (int)(IyB[x, y, i] * 1000);
+                IyB[x, y, i] = (double)tmp / 1000;
+                str += "(" + IxB[x, y, i] + ", " + IyB[x, y, i] + ")   ";
             }
 
-            str += "\nM00 = " + M[0, 0] + ", M01 = " + M[1, 0] + ", M11 = " + M[1, 1] + "\n";
-            str += "bigLambda = " + bigLambda + ", smallLambda = " + smallLambda  + "\n";
-            str += "R = " + R  + "\n";
+            str += "\nM00 = " + M[x, y, 0, 0] + ", M01 = " + M[x, y, 1, 0] + ", M11 = " + M[x, y, 1, 1] + "\n";
+            str += "bigLambda = " + bigLambda[x, y] + ", smallLambda = " + smallLambda[x, y] + "\n";
+            str += "R = " + R[x, y] + "\n";
             label7.Text = str;
         }
 
