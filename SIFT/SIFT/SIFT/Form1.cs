@@ -27,6 +27,7 @@ namespace SIFT
         double[,] R, det, trace, smallLambda, bigLambda;
         double[,,] IxB, IyB;
         double[,,,] M;
+        bool canShowGrayImage = false, canShowCorner = false, canShowDifference = false;
 
         public Form1()
         {
@@ -91,6 +92,7 @@ namespace SIFT
 
             label1.Text = "灰階";
             pictureBox1.Image = bitmap;
+            canShowGrayImage = true;
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -195,7 +197,14 @@ namespace SIFT
                                 sum += temp;
                             }
                         //儲存
+                        /*
+                        if (sum > 128)
+                            sum = sum * 0.98;
+                        else
+                            sum = sum * 1.02;
+                            */
                         int tempColor = (int)sum;
+
                         imageGray[i - 3, j - 3] = tempColor;
                         pyramidGray[T, i - 3, j - 3] = tempColor;
                     }
@@ -344,7 +353,7 @@ namespace SIFT
             smallLambda = new double[bitmap.Width, bitmap.Height];
 
             double lambda1, lambda2;
-            int rightPoint = sizeOfw / 2 - 1;
+            int rightPoint = sizeOfw / 2;
             CornerPoint = new int[bitmap.Width, bitmap.Height];
             double[,] tempCornerPoint = new double[bitmap.Width, bitmap.Height];
 
@@ -354,9 +363,9 @@ namespace SIFT
                 {
                     //算Ix,Iy
                     int c = 0;
-                    for (int tempi = -rightPoint; tempi < rightPoint; tempi++)
+                    for (int tempi = -rightPoint; tempi <= rightPoint; tempi++)
                     {
-                        for (int tempj = -rightPoint; tempj < rightPoint; tempj++)
+                        for (int tempj = -rightPoint; tempj <= rightPoint; tempj++)
                         {
                             double Ix, Iy;
                             int nowi = i + tempi, nowj = j + tempj;
@@ -394,19 +403,18 @@ namespace SIFT
                         tempCornerPoint[i, j] = R[i, j];
                 }
             }
-
             //Suppress non-maximum points
-            for (int tempi = sizeOfw, maxX = bitmap.Width - sizeOfw; tempi < maxX; tempi++)
+            for (int tempi = rightPoint, maxX = bitmap.Width - rightPoint; tempi < maxX; tempi++)
             {
-                for (int tempj = sizeOfw, maxY = bitmap.Height - sizeOfw; tempj < maxY; tempj++)
+                for (int tempj = rightPoint, maxY = bitmap.Height - rightPoint; tempj < maxY; tempj++)
                 {
                     double currentValue = tempCornerPoint[tempi, tempj];
 
                     // for each windows' row
-                    for (int trasei = -sizeOfw; (currentValue != 0) && (trasei <= sizeOfw); trasei++)
+                    for (int trasei = -rightPoint; (currentValue != 0) && (trasei <= rightPoint); trasei++)
                     {
                         // for each windows' pixel
-                        for (int trasej = -sizeOfw; trasej <= sizeOfw; trasej++)
+                        for (int trasej = -rightPoint; trasej <= rightPoint; trasej++)
                         {
                             if (tempCornerPoint[tempi + trasei, tempj + trasej] > currentValue)
                             {
@@ -423,7 +431,6 @@ namespace SIFT
                     }
                 }
             }
-
             for (int i = 0; i < bitmap.Width; i++)
                 for (int j = 0; j < bitmap.Height; j++)
                         bitmap.SetPixel(i, j, Color.FromArgb(imageGray[i, j], imageGray[i, j], imageGray[i, j]));
@@ -449,6 +456,7 @@ namespace SIFT
                     }
             label1.Text = "尋找角落";
             pictureBox1.Image = bitmap;
+            canShowCorner = true;
         }
 
         private void button3_Click(object sender, EventArgs e)
@@ -499,28 +507,31 @@ namespace SIFT
             textBox4.Text = x + "";
             textBox5.Text = y + "";
 
+            if (!canShowGrayImage)
+                return;
             for (int i = 0; i < bitmap.Width; i++)
                 for (int j = 0; j < bitmap.Height; j++)
                     bitmap.SetPixel(i, j, Color.FromArgb(imageGray[i, j], imageGray[i, j], imageGray[i, j]));
             //打角落的點
-            for (int i = 0; i < bitmap.Width; i++)
-                for (int j = 0; j < bitmap.Height; j++)
-                    if (CornerPoint[i, j] != 0)
-                    {
-                        bitmap.SetPixel(i, j, Color.Orange);
-                        bitmap.SetPixel(i, j - 1, Color.Orange);
-                        bitmap.SetPixel(i, j - 2, Color.Orange);
-                        bitmap.SetPixel(i, j - 3, Color.Orange);
-                        bitmap.SetPixel(i, j + 1, Color.Orange);
-                        bitmap.SetPixel(i, j + 2, Color.Orange);
-                        bitmap.SetPixel(i, j + 3, Color.Orange);
-                        bitmap.SetPixel(i - 1, j, Color.Orange);
-                        bitmap.SetPixel(i - 2, j, Color.Orange);
-                        bitmap.SetPixel(i - 3, j, Color.Orange);
-                        bitmap.SetPixel(i + 1, j, Color.Orange);
-                        bitmap.SetPixel(i + 2, j, Color.Orange);
-                        bitmap.SetPixel(i + 3, j, Color.Orange);
-                    }
+            if(canShowCorner)
+                for (int i = 0; i < bitmap.Width; i++)
+                    for (int j = 0; j < bitmap.Height; j++)
+                        if (CornerPoint[i, j] != 0)
+                        {
+                            bitmap.SetPixel(i, j, Color.Orange);
+                            bitmap.SetPixel(i, j - 1, Color.Orange);
+                            bitmap.SetPixel(i, j - 2, Color.Orange);
+                            bitmap.SetPixel(i, j - 3, Color.Orange);
+                            bitmap.SetPixel(i, j + 1, Color.Orange);
+                            bitmap.SetPixel(i, j + 2, Color.Orange);
+                            bitmap.SetPixel(i, j + 3, Color.Orange);
+                            bitmap.SetPixel(i - 1, j, Color.Orange);
+                            bitmap.SetPixel(i - 2, j, Color.Orange);
+                            bitmap.SetPixel(i - 3, j, Color.Orange);
+                            bitmap.SetPixel(i + 1, j, Color.Orange);
+                            bitmap.SetPixel(i + 2, j, Color.Orange);
+                            bitmap.SetPixel(i + 3, j, Color.Orange);
+                        }
             //打滑鼠點
             for (int i = 0; i < bitmap.Width; i++)
                 for (int j = 0; j < bitmap.Height; j++)
@@ -547,7 +558,9 @@ namespace SIFT
         {
             //更改座標值將點標出來
             //enter的編號是13
-            if (e.KeyChar == Convert.ToChar(13))
+            if (!canShowGrayImage)
+                return;
+            else if (e.KeyChar == Convert.ToChar(13))
             {
                 int x, y;
                 x = int.Parse(textBox4.Text);
@@ -557,24 +570,25 @@ namespace SIFT
                     for (int j = 0; j < bitmap.Height; j++)
                         bitmap.SetPixel(i, j, Color.FromArgb(imageGray[i, j], imageGray[i, j], imageGray[i, j]));
                 //打角落的點
-                for (int i = 0; i < bitmap.Width; i++)
-                    for (int j = 0; j < bitmap.Height; j++)
-                        if (CornerPoint[i, j] != 0)
-                        {
-                            bitmap.SetPixel(i, j, Color.Orange);
-                            bitmap.SetPixel(i, j - 1, Color.Orange);
-                            bitmap.SetPixel(i, j - 2, Color.Orange);
-                            bitmap.SetPixel(i, j - 3, Color.Orange);
-                            bitmap.SetPixel(i, j + 1, Color.Orange);
-                            bitmap.SetPixel(i, j + 2, Color.Orange);
-                            bitmap.SetPixel(i, j + 3, Color.Orange);
-                            bitmap.SetPixel(i - 1, j, Color.Orange);
-                            bitmap.SetPixel(i - 2, j, Color.Orange);
-                            bitmap.SetPixel(i - 3, j, Color.Orange);
-                            bitmap.SetPixel(i + 1, j, Color.Orange);
-                            bitmap.SetPixel(i + 2, j, Color.Orange);
-                            bitmap.SetPixel(i + 3, j, Color.Orange);
-                        }
+                if(canShowCorner)
+                    for (int i = 0; i < bitmap.Width; i++)
+                        for (int j = 0; j < bitmap.Height; j++)
+                            if (CornerPoint[i, j] != 0)
+                            {
+                                bitmap.SetPixel(i, j, Color.Orange);
+                                bitmap.SetPixel(i, j - 1, Color.Orange);
+                                bitmap.SetPixel(i, j - 2, Color.Orange);
+                                bitmap.SetPixel(i, j - 3, Color.Orange);
+                                bitmap.SetPixel(i, j + 1, Color.Orange);
+                                bitmap.SetPixel(i, j + 2, Color.Orange);
+                                bitmap.SetPixel(i, j + 3, Color.Orange);
+                                bitmap.SetPixel(i - 1, j, Color.Orange);
+                                bitmap.SetPixel(i - 2, j, Color.Orange);
+                                bitmap.SetPixel(i - 3, j, Color.Orange);
+                                bitmap.SetPixel(i + 1, j, Color.Orange);
+                                bitmap.SetPixel(i + 2, j, Color.Orange);
+                                bitmap.SetPixel(i + 3, j, Color.Orange);
+                            }
                 //打滑鼠點
                 for (int i = 0; i < bitmap.Width; i++)
                     for (int j = 0; j < bitmap.Height; j++)
@@ -603,7 +617,9 @@ namespace SIFT
         {
             //更改座標值將點標出來
             //enter的編號是13
-            if (e.KeyChar == Convert.ToChar(13))
+            if (!canShowGrayImage)
+                return;
+            else if (e.KeyChar == Convert.ToChar(13))
             {
                 int x, y;
                 x = int.Parse(textBox4.Text);
@@ -613,24 +629,25 @@ namespace SIFT
                     for (int j = 0; j < bitmap.Height; j++)
                         bitmap.SetPixel(i, j, Color.FromArgb(imageGray[i, j], imageGray[i, j], imageGray[i, j]));
                 //打角落的點
-                for (int i = 0; i < bitmap.Width; i++)
-                    for (int j = 0; j < bitmap.Height; j++)
-                        if (CornerPoint[i, j] != 0)
-                        {
-                            bitmap.SetPixel(i, j, Color.Orange);
-                            bitmap.SetPixel(i, j - 1, Color.Orange);
-                            bitmap.SetPixel(i, j - 2, Color.Orange);
-                            bitmap.SetPixel(i, j - 3, Color.Orange);
-                            bitmap.SetPixel(i, j + 1, Color.Orange);
-                            bitmap.SetPixel(i, j + 2, Color.Orange);
-                            bitmap.SetPixel(i, j + 3, Color.Orange);
-                            bitmap.SetPixel(i - 1, j, Color.Orange);
-                            bitmap.SetPixel(i - 2, j, Color.Orange);
-                            bitmap.SetPixel(i - 3, j, Color.Orange);
-                            bitmap.SetPixel(i + 1, j, Color.Orange);
-                            bitmap.SetPixel(i + 2, j, Color.Orange);
-                            bitmap.SetPixel(i + 3, j, Color.Orange);
-                        }
+                if(canShowCorner)
+                    for (int i = 0; i < bitmap.Width; i++)
+                        for (int j = 0; j < bitmap.Height; j++)
+                            if (CornerPoint[i, j] != 0)
+                            {
+                                bitmap.SetPixel(i, j, Color.Orange);
+                                bitmap.SetPixel(i, j - 1, Color.Orange);
+                                bitmap.SetPixel(i, j - 2, Color.Orange);
+                                bitmap.SetPixel(i, j - 3, Color.Orange);
+                                bitmap.SetPixel(i, j + 1, Color.Orange);
+                                bitmap.SetPixel(i, j + 2, Color.Orange);
+                                bitmap.SetPixel(i, j + 3, Color.Orange);
+                                bitmap.SetPixel(i - 1, j, Color.Orange);
+                                bitmap.SetPixel(i - 2, j, Color.Orange);
+                                bitmap.SetPixel(i - 3, j, Color.Orange);
+                                bitmap.SetPixel(i + 1, j, Color.Orange);
+                                bitmap.SetPixel(i + 2, j, Color.Orange);
+                                bitmap.SetPixel(i + 3, j, Color.Orange);
+                            }
                 //打滑鼠點
                 for (int i = 0; i < bitmap.Width; i++)
                     for (int j = 0; j < bitmap.Height; j++)
