@@ -83,6 +83,16 @@ namespace SIFT.Properties {
         /// <summary>
         ///   查詢類型 System.Drawing.Bitmap 的當地語系化資源。
         /// </summary>
+        internal static System.Drawing.Bitmap f09ef9a0_34d9_4a2e_b9f9_af2205705039_jpg_w300x300 {
+            get {
+                object obj = ResourceManager.GetObject("f09ef9a0_34d9_4a2e_b9f9_af2205705039_jpg_w300x300", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   查詢類型 System.Drawing.Bitmap 的當地語系化資源。
+        /// </summary>
         internal static System.Drawing.Bitmap test {
             get {
                 object obj = ResourceManager.GetObject("test", resourceCulture);

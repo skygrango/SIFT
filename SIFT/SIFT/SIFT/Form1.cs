@@ -12,7 +12,8 @@ namespace SIFT
 {
     public partial class Form1 : Form
     {
-        Image myImage = SIFT.Properties.Resources.aaa;
+        Image myImage = SIFT.Properties.Resources.f09ef9a0_34d9_4a2e_b9f9_af2205705039_jpg_w300x300;
+        Image grayImage;
         Bitmap bitmap, orignBitmap;
         System.Drawing.Imaging.PixelFormat format;
         Rectangle cloneRect;
@@ -21,13 +22,57 @@ namespace SIFT
         int[,,] pyramidGray;
         int[,,] BoardDiff;
         int[,] DiffPoint;
-        double minLambda = 0, k;
+        double minLambda = 0;
         int[,] CornerPoint;
-        int sizeOfw = 7;//找角落時的方格大小
-        double[,] R, det, trace, smallLambda, bigLambda;
-        double[,,] IxB, IyB;
-        double[,,,] M;
-        bool canShowGrayImage = false, canShowCorner = false, canShowDifference = false;
+        int sizeOfw = 7, inteInfoCounter = 0;//找角落時的方格大小
+        bool grayFinish = false;
+        int[,] BoardKeypoint;
+        InterestedInformations[] inteInfo;//紀錄分別的關鍵點的資訊用的結構
+
+        class InterestedInformations
+        {
+            public bool isNotEmpty;
+            public int x, y, sita;
+            public double gradientMagnitudes, R, bigLambda, smallLambda;
+            public double[] fingerprint;
+            public InterestedInformations()
+            {
+                isNotEmpty = false;
+                x = 0;
+                y = 0;
+                R = 0;
+                bigLambda = 0;
+                smallLambda = 0;
+                sita = 0;
+                gradientMagnitudes = 0;
+                fingerprint = new double[128];
+            }
+
+            public void normalize(int times)
+            {
+                //正規化fingerprints
+                double sum = 0;
+                bool hadrevised = false;
+                for (int i = 0; i < 128; i++)
+                    sum += fingerprint[i];
+                if (sum == 0)//避免全都是0
+                    return;
+                for (int i = 0; i < 128; i++)
+                    fingerprint[i] /= sum;
+                //大於0.2者改成0.2為了尺度不變性
+                for (int i = 0; i < 128; i++)
+                {
+                    if (fingerprint[i] > 0.2)
+                    { 
+                        fingerprint[i] = 0.2;
+                        hadrevised = true;
+                    }
+                }
+                //如果有被修正則重新呼叫自己一次，避免無窮迴圈
+                if (hadrevised && times < 5)
+                    normalize(times + 1);
+            }
+        }
 
         public Form1()
         {
@@ -41,8 +86,15 @@ namespace SIFT
 
             bitmap = orignBitmap.Clone(cloneRect, format);
             textBox1.Text = 2 + "";
-            textBox2.Text = 5 + "";
-            textBox3.Text = 0.04 + "";
+            textBox2.Text = 0.4 + "";
+            textBox3.Text = 20 + "";
+            textBox4.Text = 0 + "";
+            textBox5.Text = 0 + "";
+
+            inteInfoCounter = 0;
+            inteInfo = new InterestedInformations[1];
+            inteInfo[0] = new InterestedInformations();
+
             pictureBox1.Image = bitmap;
         }
 
@@ -58,9 +110,12 @@ namespace SIFT
 
             bitmap = orignBitmap.Clone(cloneRect, format);
             textBox1.Text = 2 + "";
-            textBox2.Text = 5 + "";
-            textBox3.Text = 0.04 + "";
+            textBox2.Text = 0.4 + "";
+            textBox3.Text = 20 + "";
+            textBox4.Text = 0 + "";
+            textBox5.Text = 0 + "";
             pictureBox1.Image = bitmap;
+            grayFinish = false;
             label1.Text = "重置";
         }
 
@@ -72,11 +127,13 @@ namespace SIFT
             sum += G * 28;
             return sum / 256;
         }
+
         private void button2_Click(object sender, EventArgs e)
         {
             //轉灰階
             orignGrayImage = new int[bitmap.Width, bitmap.Height];
             imageGray = new int[bitmap.Width, bitmap.Height];
+            BoardKeypoint = new int[bitmap.Width, bitmap.Height];
             Color tempColor;
 
             for (int i = 0; i < bitmap.Width; i++)
@@ -89,10 +146,15 @@ namespace SIFT
                     bitmap.SetPixel(i, j, Color.FromArgb(tempGray, tempGray, tempGray));
                 }
 
+            orignBitmap = new Bitmap(myImage);
+
+            format = orignBitmap.PixelFormat;
+            cloneRect = new Rectangle(0, 0, orignBitmap.Width, orignBitmap.Height);
+            grayImage = bitmap.Clone(cloneRect, format);
 
             label1.Text = "灰階";
+            grayFinish = true;
             pictureBox1.Image = bitmap;
-            canShowGrayImage = true;
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -197,14 +259,7 @@ namespace SIFT
                                 sum += temp;
                             }
                         //儲存
-                        /*
-                        if (sum > 128)
-                            sum = sum * 0.98;
-                        else
-                            sum = sum * 1.02;
-                            */
                         int tempColor = (int)sum;
-
                         imageGray[i - 3, j - 3] = tempColor;
                         pyramidGray[T, i - 3, j - 3] = tempColor;
                     }
@@ -262,7 +317,7 @@ namespace SIFT
              * 共找8次: 012,123,234,345,456,567,678,789*/
              
             DiffPoint = new int[bitmap.Width, bitmap.Height];
-            for(int T = 1; T < 8; T++)
+            for (int T = 1; T < 8; T++)
             {
                 for (int i = 1; i < bitmap.Width - 1; i++)
                 {
@@ -289,18 +344,16 @@ namespace SIFT
                             BoardDiff[T, i, j] < BoardDiff[T + 1, i, j - 1]     && BoardDiff[T, i, j] < BoardDiff[T + 1, i, j]     && BoardDiff[T, i, j] < BoardDiff[T + 1, i, j + 1] &&
                             BoardDiff[T, i, j] < BoardDiff[T + 1, i + 1, j - 1] && BoardDiff[T, i, j] < BoardDiff[T + 1, i + 1, j] && BoardDiff[T, i, j] < BoardDiff[T + 1, i + 1, j + 1])
                             DiffPoint[i, j]++;
+                        if(DiffPoint[i,j] > 0)
+                            bitmap.SetPixel(i, j, Color.Red);
+                        else
+                            bitmap.SetPixel(i, j, Color.FromArgb(imageGray[i, j], imageGray[i, j], imageGray[i, j]));
                     }
                 }
             }
 
-            for (int i = 0; i < bitmap.Width; i++)
-                for (int j = 0; j < bitmap.Height; j++)
-                    if(DiffPoint[i, j] == 0)
-                        bitmap.SetPixel(i, j, Color.FromArgb(orignGrayImage[i, j], orignGrayImage[i, j], orignGrayImage[i, j]));
-                    else
-                        bitmap.SetPixel(i, j, Color.Red);
-            label1.Text = "差異點";
             pictureBox1.Image = bitmap;
+            label1.Text = "差異點";
         }
 
         private void button1_Click_1(object sender, EventArgs e)
@@ -327,94 +380,96 @@ namespace SIFT
                     }
                 }
             }
-            for (int i = 0; i < bitmap.Width; i++)
-                for (int j = 0; j < bitmap.Height; j++)
-                    if (DiffPoint[i, j] == 0)
-                        bitmap.SetPixel(i, j, Color.FromArgb(orignGrayImage[i, j], orignGrayImage[i, j], orignGrayImage[i, j]));
-                    else
+            for(int i = 0; i < bitmap.Width; i++)
+                for(int j = 0; j < bitmap.Height; j++)
+                    if (DiffPoint[i, j] > 0 && BoardKeypoint[i, j] == 0)
                     {
-                        bitmap.SetPixel(i, j, Color.Red);
+                        if (BoardKeypoint[i, j] == 0)
+                        {
+                            inteInfo[inteInfoCounter].isNotEmpty = true;
+                            inteInfo[inteInfoCounter].x = i;
+                            inteInfo[inteInfoCounter].y = j;
+                            BoardKeypoint[i, j] = 1;
+
+                            Array.Resize(ref inteInfo, inteInfo.Length + 1);
+                            inteInfoCounter++;
+                            inteInfo[inteInfoCounter] = new InterestedInformations();
+                        }
                     }
+
+            refreshScreen(0, 0);
             label1.Text = "低對比消除";
-            pictureBox1.Image = bitmap;
         }
 
         private void button2_Click_1(object sender, EventArgs e)
         {
             //找角落
-            minLambda = double.Parse(textBox2.Text); //最小浪打值
-            M = new double[bitmap.Width, bitmap.Height, 2, 2];
-            det = new double[bitmap.Width, bitmap.Height];
-            trace = new double[bitmap.Width, bitmap.Height];
-            R = new double[bitmap.Width, bitmap.Height];
-            IxB = new double[bitmap.Width, bitmap.Height, sizeOfw * sizeOfw];
-            IyB = new double[bitmap.Width, bitmap.Height, sizeOfw * sizeOfw];
-            bigLambda = new double[bitmap.Width, bitmap.Height];
-            smallLambda = new double[bitmap.Width, bitmap.Height];
-
-            double lambda1, lambda2;
+            double R, ratio, minR, k = 0.04;
+            double det, trace, smallLambda, bigLambda, lambda1, lambda2;
             int rightPoint = sizeOfw / 2;
             CornerPoint = new int[bitmap.Width, bitmap.Height];
             double[,] tempCornerPoint = new double[bitmap.Width, bitmap.Height];
 
-            for (int i = 1 + rightPoint; i < bitmap.Width - sizeOfw + rightPoint; i++)
+            minLambda = double.Parse(textBox2.Text); //最小浪打值
+            ratio = double.Parse(textBox2.Text); //兩個浪打的比值
+            minR = double.Parse(textBox3.Text); //R的最小接受值
+
+            for (int i = 1 + rightPoint; i < bitmap.Width - rightPoint - 1; i++)
             {
-                for (int j = 1 + rightPoint; j < bitmap.Height - sizeOfw + rightPoint; j++)
+                for (int j = 1 + rightPoint; j < bitmap.Height - rightPoint - 1; j++)
                 {
-                    //算Ix,Iy
-                    int c = 0;
-                    for (int tempi = -rightPoint; tempi <= rightPoint; tempi++)
+                    //計算Ix,Iy
+                    double[,] M = new double[2, 2];
+                    for (int tempi = 0; tempi < sizeOfw; tempi++)
                     {
-                        for (int tempj = -rightPoint; tempj <= rightPoint; tempj++)
+                        for (int tempj = 0; tempj < sizeOfw; tempj++)
                         {
                             double Ix, Iy;
-                            int nowi = i + tempi, nowj = j + tempj;
+                            int nowi = i + tempi - rightPoint, nowj = j + tempj - rightPoint;
                             //分別對x,y微分出Ix,Iy
-                            Ix = imageGray[nowi + 1, nowj - 1] + 2 * imageGray[nowi + 1, nowj] + imageGray[nowi + 1, nowj + 1] - imageGray[nowi - 1, nowj - 1] - 2 * imageGray[nowi - 1, nowj] - imageGray[nowi - 1, nowj + 1];
-                            Iy = imageGray[nowi - 1, nowj + 1] + 2 * imageGray[nowi, nowj + 1] + imageGray[nowi + 1, nowj + 1] - imageGray[nowi - 1, nowj - 1] - 2 * imageGray[nowi, nowj - 1] - imageGray[nowi + 1, nowj - 1];
+                            Ix = orignGrayImage[nowi + 1, nowj - 1] + 2 * orignGrayImage[nowi + 1, nowj] + orignGrayImage[nowi + 1, nowj + 1] - orignGrayImage[nowi - 1, nowj - 1] - 2 * orignGrayImage[nowi - 1, nowj] - orignGrayImage[nowi - 1, nowj + 1];
+                            Iy = orignGrayImage[nowi - 1, nowj + 1] + 2 * orignGrayImage[nowi, nowj + 1] + orignGrayImage[nowi + 1, nowj + 1] - orignGrayImage[nowi - 1, nowj - 1] - 2 * orignGrayImage[nowi, nowj - 1] - orignGrayImage[nowi + 1, nowj - 1];
                             Ix /= 255;
                             Iy /= 255;
                             //將值加總進陣列M
-                            M[i, j, 0, 0] += Ix * Ix * imageGray[nowi, nowj] / (sizeOfw * sizeOfw);
-                            M[i, j, 0, 1] += Ix * Iy * imageGray[nowi, nowj] / (sizeOfw * sizeOfw);
-                            M[i, j, 1, 0] = M[i, j, 0, 1];
-                            M[i, j, 1, 1] += Iy * Iy * imageGray[nowi, nowj] / (sizeOfw * sizeOfw);
-                            IxB[i, j, c] = Ix;
-                            IyB[i, j, c] = Iy;
-                            c++;
+                            M[0, 0] += Ix * Ix * orignGrayImage[nowi, nowj] / (sizeOfw * sizeOfw);
+                            M[0, 1] += Ix * Iy * orignGrayImage[nowi, nowj] / (sizeOfw * sizeOfw);
+                            M[1, 0] = M[0, 1];
+                            M[1, 1] += Iy * Iy * orignGrayImage[nowi, nowj] / (sizeOfw * sizeOfw);
                         }
                     }
                     //計算det( = )與trace( = Ix^2 + Iy^2)
-                    det[i, j] = M[i, j, 0, 0] * M[i, j, 1, 1] - M[i, j, 0, 1] * M[i, j, 1, 0];
-                    trace[i, j] = M[i, j, 0, 0] + M[i, j, 1, 1];
+                    det = M[0, 0] * M[1, 1] - M[0, 1] * M[1, 0];
+                    trace = M[0, 0] + M[1, 1];
 
                     //計算R,浪打1,浪打2
-                    lambda2 = (trace[i, j] + Math.Sqrt(trace[i, j] * trace[i, j] - 4 * det[i, j])) / 2;
-                    lambda1 = (trace[i, j] - Math.Sqrt(trace[i, j] * trace[i, j] - 4 * det[i, j])) / 2;
-                    R[i, j] = det[i, j] - k * trace[i, j] * trace[i, j];
+                    lambda2 = (trace + Math.Sqrt(trace * trace - 4 * det)) / 2;
+                    lambda1 = (trace - Math.Sqrt(trace * trace - 4 * det)) / 2;
+                    R = det - k * trace * trace;
 
                     //找兩個浪打間的最小值
                     //lambda(max) / lambda(min) > 0.8 ?
-                    smallLambda[i, j] = lambda1 < lambda2 ? lambda1 : lambda2;
-                    bigLambda[i, j] = lambda1 > lambda2 ? lambda1 : lambda2;
+                    smallLambda = lambda1 < lambda2 ? lambda1 : lambda2;
+                    bigLambda = lambda1 > lambda2 ? lambda1 : lambda2;
                     // && smallLambda / bigLambda > 0.95
                     //if (smallLambda > minLambda)
-                    if (R[i, j] > minLambda)
-                        tempCornerPoint[i, j] = R[i, j];
+                    if (R > minR)
+                        tempCornerPoint[i, j] = R;
                 }
             }
+
             //Suppress non-maximum points
-            for (int tempi = rightPoint, maxX = bitmap.Width - rightPoint; tempi < maxX; tempi++)
+            for (int tempi = sizeOfw, maxX = bitmap.Width - sizeOfw; tempi < maxX; tempi++)
             {
-                for (int tempj = rightPoint, maxY = bitmap.Height - rightPoint; tempj < maxY; tempj++)
+                for (int tempj = sizeOfw, maxY = bitmap.Height - sizeOfw; tempj < maxY; tempj++)
                 {
                     double currentValue = tempCornerPoint[tempi, tempj];
 
                     // for each windows' row
-                    for (int trasei = -rightPoint; (currentValue != 0) && (trasei <= rightPoint); trasei++)
+                    for (int trasei = -sizeOfw; (currentValue != 0) && (trasei <= sizeOfw); trasei++)
                     {
                         // for each windows' pixel
-                        for (int trasej = -rightPoint; trasej <= rightPoint; trasej++)
+                        for (int trasej = -sizeOfw; trasej <= sizeOfw; trasej++)
                         {
                             if (tempCornerPoint[tempi + trasei, tempj + trasej] > currentValue)
                             {
@@ -428,35 +483,149 @@ namespace SIFT
                     if (currentValue != 0)
                     {
                         CornerPoint[tempi, tempj]++;
+                        if (BoardKeypoint[tempi, tempj] == 0)
+                        {
+                            inteInfo[inteInfoCounter].isNotEmpty = true;
+                            inteInfo[inteInfoCounter].x = tempi;
+                            inteInfo[inteInfoCounter].y = tempj;
+                            inteInfo[inteInfoCounter].R = tempCornerPoint[tempi, tempj];
+                            BoardKeypoint[tempi, tempj] = 1;
+
+                            Array.Resize(ref inteInfo, inteInfo.Length + 1);
+                            inteInfoCounter++;
+                            inteInfo[inteInfoCounter] = new InterestedInformations();
+                        }
                     }
                 }
             }
-            for (int i = 0; i < bitmap.Width; i++)
-                for (int j = 0; j < bitmap.Height; j++)
-                        bitmap.SetPixel(i, j, Color.FromArgb(imageGray[i, j], imageGray[i, j], imageGray[i, j]));
             
-            //打點
-            for (int i = 0; i < bitmap.Width; i++)
-                for (int j = 0; j < bitmap.Height; j++)
-                    if (CornerPoint[i, j] != 0)
+            refreshScreen(0, 0);
+
+            label1.Text = "尋找角落, " + inteInfoCounter;
+        }
+
+        private void button4_Click_1(object sender, EventArgs e)
+        {
+            //畫出關鍵點走勢
+            double sita = 0;
+            double[,] gm;
+
+            for(int c = 0; c < inteInfo.Length - 1; c++)
+            {
+                int x = inteInfo[c].x;
+                int y = inteInfo[c].y;
+                gm = new double[36,2];
+                double maxGM = 0;
+                int maxSita = 0, maxGMCounter = 0;
+                for (int i = -8; i <= 8; i++)
+                {
+                    int nowX = x + i;
+                    if (nowX > 1 && nowX < bitmap.Width - 1)
+                        for (int j = -8; j <= 8; j++)
+                        {
+                            int nowY = y + j;
+                            if (nowY > 1 && nowY < bitmap.Height - 1)
+                            {
+                                double Lx1y = imageGray[nowX + 1, nowY], Lx2y = imageGray[nowX - 1, nowY], Lxy1 = imageGray[nowX, nowY + 1], Lxy2 = imageGray[nowX, nowY - 1];
+
+                                sita = Math.Atan2(Lxy1 - Lxy2, Lx1y - Lx2y);
+                                sita /= Math.PI;
+                                sita *= 180;
+                                sita += 180;
+
+                                int index = (int)sita / 10;
+                                if (index == 36)
+                                    index = 0;
+                                gm[index, 0] += Math.Sqrt((Lx1y - Lx2y) * (Lx1y - Lx2y) + (Lxy1 - Lxy2) * (Lxy1 - Lxy2));
+                                gm[index, 1]++;
+                            }
+                        }
+                }
+                for(int i = 0; i < 36; i++)
+                {
+                    if(maxGM < gm[i,0])
                     {
-                        bitmap.SetPixel(i, j, Color.Orange);
-                        bitmap.SetPixel(i, j - 1, Color.Orange);
-                        bitmap.SetPixel(i, j - 2, Color.Orange);
-                        bitmap.SetPixel(i, j - 3, Color.Orange);
-                        bitmap.SetPixel(i, j + 1, Color.Orange);
-                        bitmap.SetPixel(i, j + 2, Color.Orange);
-                        bitmap.SetPixel(i, j + 3, Color.Orange);
-                        bitmap.SetPixel(i - 1, j, Color.Orange);
-                        bitmap.SetPixel(i - 2, j, Color.Orange);
-                        bitmap.SetPixel(i - 3, j, Color.Orange);
-                        bitmap.SetPixel(i + 1, j, Color.Orange);
-                        bitmap.SetPixel(i + 2, j, Color.Orange);
-                        bitmap.SetPixel(i + 3, j, Color.Orange);
+                        maxGM = gm[i,0];
+                        maxGMCounter = (int)gm[i, 1];
+                        maxSita = i * 10 - 180;
                     }
-            label1.Text = "尋找角落";
+                }
+                inteInfo[c].gradientMagnitudes = maxGM / maxGMCounter;
+                inteInfo[c].sita = maxSita;
+            }
+            /*
+            bitmap = new Bitmap(bitmap.Width, bitmap.Height, g);
+            g.Dispose();
             pictureBox1.Image = bitmap;
-            canShowCorner = true;
+            */
+            label1.Text = "走勢";
+        }
+
+        private double[] fingerprintCalculator(int x, int y, int sita)
+        {
+            //計算每一個4*4的8個fingerprint
+            double[] gm = new double[8];
+            double tempsita;
+            for (int i = x; i < x + 4; i++)
+            {
+                if (i > 1 && i < bitmap.Width - 1)
+                    for (int j = y; j < y + 4; j++)
+                    {
+                        if (j > 1 && j < bitmap.Height - 1)
+                        {
+                            double Lx1y = imageGray[i + 1, j], Lx2y = imageGray[i - 1, j], Lxy1 = imageGray[i, j + 1], Lxy2 = imageGray[i, j - 1];
+
+                            tempsita = Math.Atan2(Lxy1 - Lxy2, Lx1y - Lx2y);
+                            tempsita /= Math.PI;
+                            tempsita *= 180;
+                            tempsita += 180;
+                            tempsita -= sita; //角度不變性
+                            //分別修正結果<0與>0的tempsita
+                            while (tempsita < 0)
+                                tempsita += 360;
+                            while (tempsita > 360)
+                                tempsita -= 360;
+
+                            int index = (int)tempsita / 45;
+                            if (index == 8)
+                                index = 0;
+                            gm[index] += Math.Sqrt((Lx1y - Lx2y) * (Lx1y - Lx2y) + (Lxy1 - Lxy2) * (Lxy1 - Lxy2));
+                        }
+
+                    }
+            }
+            refreshScreen(0, 0);
+            return gm;
+        }
+
+        private void button5_Click(object sender, EventArgs e)
+        {
+            //製作專屬指紋
+            for (int c = 0; c < inteInfo.Length - 1; c++)
+            {
+                int x = inteInfo[c].x, y = inteInfo[c].y;
+                int sita = inteInfo[c].sita;
+                int fingerCount = 0;
+                //拆成16個運算分別儲存
+                for(int j = y - 8; j <= y + 4; j += 4)
+                {
+                    for (int i = x - 8; i <= x + 4; i += 4)
+                    {
+                        double[] temp = fingerprintCalculator(i, j, sita);
+                        inteInfo[c].fingerprint[fingerCount] = temp[0];
+                        inteInfo[c].fingerprint[fingerCount + 1] = temp[1];
+                        inteInfo[c].fingerprint[fingerCount + 2] = temp[2];
+                        inteInfo[c].fingerprint[fingerCount + 3] = temp[3];
+                        inteInfo[c].fingerprint[fingerCount + 4] = temp[4];
+                        inteInfo[c].fingerprint[fingerCount + 5] = temp[5];
+                        inteInfo[c].fingerprint[fingerCount + 6] = temp[6];
+                        inteInfo[c].fingerprint[fingerCount + 7] = temp[7];
+                        fingerCount += 8;
+                    }
+                }
+                inteInfo[c].normalize(0);
+            }
+            label1.Text = "指紋";
         }
 
         private void button3_Click(object sender, EventArgs e)
@@ -466,35 +635,42 @@ namespace SIFT
             bitmap.Save(saveFileDialog1.FileName);
         }
 
-        
         private void show_Click(object sender, EventArgs e)
         {
             //show出一些需要的資訊//算Ix,Iy
-            int x, y;
+            int x, y, i;
+            bool hasInfo = false;
             x = int.Parse(textBox4.Text);
-            y = int.Parse(textBox5.Text);/*
-            double det, trace, lambda1, lambda2, R, bigLambda, smallLambda;
-            double[,] M = new double[2, 2];
-            double[] IxB = new double[sizeOfw * sizeOfw];
-            double[] IyB = new double[sizeOfw * sizeOfw];*/
-            string str = "Ix,Iy:";
-
-            
-            for(int i = 0; i < sizeOfw * sizeOfw; i++)
+            y = int.Parse(textBox5.Text);
+            string str = "";
+            for (i = 0; i < inteInfo.Length; i++)
             {
-                if (i % sizeOfw == 0)
-                    str += "\n";
-
-                int tmp = (int)(IxB[x, y, i] * 1000);
-                IxB[x, y, i] = (double)tmp / 1000;
-                tmp = (int)(IyB[x, y, i] * 1000);
-                IyB[x, y, i] = (double)tmp / 1000;
-                str += "(" + IxB[x, y, i] + ", " + IyB[x, y, i] + ")   ";
+                if (inteInfo[i].x == x)
+                {
+                    if (inteInfo[i].y == y)
+                    {
+                        hasInfo = true;
+                        break;
+                    }
+                }
             }
-
-            str += "\nM00 = " + M[x, y, 0, 0] + ", M01 = " + M[x, y, 1, 0] + ", M11 = " + M[x, y, 1, 1] + "\n";
-            str += "bigLambda = " + bigLambda[x, y] + ", smallLambda = " + smallLambda[x, y] + "\n";
-            str += "R = " + R[x, y] + "\n";
+            if (!hasInfo)
+                str = "No interested data\n";
+            else
+            {
+                str += "R = " + inteInfo[i].R + "\n";
+              /*  str += "bigLambda = " + inteInfo[i].bigLambda + "\n";
+                str += "smallLambda = " + inteInfo[i].smallLambda + "\n";
+                str += "smallLambda / bigLambda = " + inteInfo[i].smallLambda / inteInfo[i].bigLambda + "\n";*/
+                str += "sita = " + inteInfo[i].sita + "\n";
+                str += "gradient magnitudes = " + inteInfo[i].gradientMagnitudes + "\n";
+                str += "fingerprint = \n{\n";
+                for(int j = 0; j < 128; j+=8)
+                {
+                    str += "(" + inteInfo[i].fingerprint[j].ToString("#0.##0") + ", " + inteInfo[i].fingerprint[j + 1].ToString("#0.##0") + ", " + inteInfo[i].fingerprint[j + 2].ToString("#0.##0") + ", " + inteInfo[i].fingerprint[j + 3].ToString("#0.##0") + ", " + inteInfo[i].fingerprint[j + 4].ToString("#0.##0") + ", " + inteInfo[i].fingerprint[j + 5].ToString("#0.##0") + ", " + inteInfo[i].fingerprint[j + 6].ToString("#0.##0") + ", " + inteInfo[i].fingerprint[j + 7].ToString("#0.##0") + ")\n";
+                }
+                str += "}\n";
+            }
             label7.Text = str;
         }
 
@@ -506,110 +682,19 @@ namespace SIFT
             y = e.Y;
             textBox4.Text = x + "";
             textBox5.Text = y + "";
-
-            if (!canShowGrayImage)
-                return;
-            for (int i = 0; i < bitmap.Width; i++)
-                for (int j = 0; j < bitmap.Height; j++)
-                    bitmap.SetPixel(i, j, Color.FromArgb(imageGray[i, j], imageGray[i, j], imageGray[i, j]));
-            //打角落的點
-            if(canShowCorner)
-                for (int i = 0; i < bitmap.Width; i++)
-                    for (int j = 0; j < bitmap.Height; j++)
-                        if (CornerPoint[i, j] != 0)
-                        {
-                            bitmap.SetPixel(i, j, Color.Orange);
-                            bitmap.SetPixel(i, j - 1, Color.Orange);
-                            bitmap.SetPixel(i, j - 2, Color.Orange);
-                            bitmap.SetPixel(i, j - 3, Color.Orange);
-                            bitmap.SetPixel(i, j + 1, Color.Orange);
-                            bitmap.SetPixel(i, j + 2, Color.Orange);
-                            bitmap.SetPixel(i, j + 3, Color.Orange);
-                            bitmap.SetPixel(i - 1, j, Color.Orange);
-                            bitmap.SetPixel(i - 2, j, Color.Orange);
-                            bitmap.SetPixel(i - 3, j, Color.Orange);
-                            bitmap.SetPixel(i + 1, j, Color.Orange);
-                            bitmap.SetPixel(i + 2, j, Color.Orange);
-                            bitmap.SetPixel(i + 3, j, Color.Orange);
-                        }
-            //打滑鼠點
-            for (int i = 0; i < bitmap.Width; i++)
-                for (int j = 0; j < bitmap.Height; j++)
-                    if (i == x && j == y)
-                    {
-                        bitmap.SetPixel(i, j, Color.Blue);
-                        bitmap.SetPixel(i, j - 1, Color.Blue);
-                        bitmap.SetPixel(i, j - 2, Color.Blue);
-                        bitmap.SetPixel(i, j - 3, Color.Blue);
-                        bitmap.SetPixel(i, j + 1, Color.Blue);
-                        bitmap.SetPixel(i, j + 2, Color.Blue);
-                        bitmap.SetPixel(i, j + 3, Color.Blue);
-                        bitmap.SetPixel(i - 1, j, Color.Blue);
-                        bitmap.SetPixel(i - 2, j, Color.Blue);
-                        bitmap.SetPixel(i - 3, j, Color.Blue);
-                        bitmap.SetPixel(i + 1, j, Color.Blue);
-                        bitmap.SetPixel(i + 2, j, Color.Blue);
-                        bitmap.SetPixel(i + 3, j, Color.Blue);
-                    }
-            pictureBox1.Image = bitmap;
+            refreshScreen(x, y);  
         }
 
         private void textBox4_KeyPress(object sender, KeyPressEventArgs e)
         {
             //更改座標值將點標出來
             //enter的編號是13
-            if (!canShowGrayImage)
-                return;
-            else if (e.KeyChar == Convert.ToChar(13))
+            if (e.KeyChar == Convert.ToChar(13))
             {
                 int x, y;
                 x = int.Parse(textBox4.Text);
                 y = int.Parse(textBox5.Text);
-
-                for (int i = 0; i < bitmap.Width; i++)
-                    for (int j = 0; j < bitmap.Height; j++)
-                        bitmap.SetPixel(i, j, Color.FromArgb(imageGray[i, j], imageGray[i, j], imageGray[i, j]));
-                //打角落的點
-                if(canShowCorner)
-                    for (int i = 0; i < bitmap.Width; i++)
-                        for (int j = 0; j < bitmap.Height; j++)
-                            if (CornerPoint[i, j] != 0)
-                            {
-                                bitmap.SetPixel(i, j, Color.Orange);
-                                bitmap.SetPixel(i, j - 1, Color.Orange);
-                                bitmap.SetPixel(i, j - 2, Color.Orange);
-                                bitmap.SetPixel(i, j - 3, Color.Orange);
-                                bitmap.SetPixel(i, j + 1, Color.Orange);
-                                bitmap.SetPixel(i, j + 2, Color.Orange);
-                                bitmap.SetPixel(i, j + 3, Color.Orange);
-                                bitmap.SetPixel(i - 1, j, Color.Orange);
-                                bitmap.SetPixel(i - 2, j, Color.Orange);
-                                bitmap.SetPixel(i - 3, j, Color.Orange);
-                                bitmap.SetPixel(i + 1, j, Color.Orange);
-                                bitmap.SetPixel(i + 2, j, Color.Orange);
-                                bitmap.SetPixel(i + 3, j, Color.Orange);
-                            }
-                //打滑鼠點
-                for (int i = 0; i < bitmap.Width; i++)
-                    for (int j = 0; j < bitmap.Height; j++)
-                        if (i == x && j == y)
-                        {
-                            bitmap.SetPixel(i, j, Color.Blue);
-                            bitmap.SetPixel(i, j - 1, Color.Blue);
-                            bitmap.SetPixel(i, j - 2, Color.Blue);
-                            bitmap.SetPixel(i, j - 3, Color.Blue);
-                            bitmap.SetPixel(i, j + 1, Color.Blue);
-                            bitmap.SetPixel(i, j + 2, Color.Blue);
-                            bitmap.SetPixel(i, j + 3, Color.Blue);
-                            bitmap.SetPixel(i - 1, j, Color.Blue);
-                            bitmap.SetPixel(i - 2, j, Color.Blue);
-                            bitmap.SetPixel(i - 3, j, Color.Blue);
-                            bitmap.SetPixel(i + 1, j, Color.Blue);
-                            bitmap.SetPixel(i + 2, j, Color.Blue);
-                            bitmap.SetPixel(i + 3, j, Color.Blue);
-                        }
-                pictureBox1.Image = bitmap;
-
+                refreshScreen(x, y);
             }
         }
 
@@ -617,58 +702,73 @@ namespace SIFT
         {
             //更改座標值將點標出來
             //enter的編號是13
-            if (!canShowGrayImage)
-                return;
-            else if (e.KeyChar == Convert.ToChar(13))
+            if (e.KeyChar == Convert.ToChar(13))
             {
                 int x, y;
                 x = int.Parse(textBox4.Text);
                 y = int.Parse(textBox5.Text);
+                refreshScreen(x, y);
+            }
+        }
 
+        private void refreshScreen(int x, int y)
+        {
+            //重新更新圖片
+            //重新讀圖
+            int rightPoint = sizeOfw / 2;
+            Pen p;
+            Graphics g = Graphics.FromImage(grayImage);
+            pictureBox1.Image = grayImage;
+            if (grayFinish)
+            {
                 for (int i = 0; i < bitmap.Width; i++)
                     for (int j = 0; j < bitmap.Height; j++)
                         bitmap.SetPixel(i, j, Color.FromArgb(imageGray[i, j], imageGray[i, j], imageGray[i, j]));
-                //打角落的點
-                if(canShowCorner)
-                    for (int i = 0; i < bitmap.Width; i++)
-                        for (int j = 0; j < bitmap.Height; j++)
-                            if (CornerPoint[i, j] != 0)
-                            {
-                                bitmap.SetPixel(i, j, Color.Orange);
-                                bitmap.SetPixel(i, j - 1, Color.Orange);
-                                bitmap.SetPixel(i, j - 2, Color.Orange);
-                                bitmap.SetPixel(i, j - 3, Color.Orange);
-                                bitmap.SetPixel(i, j + 1, Color.Orange);
-                                bitmap.SetPixel(i, j + 2, Color.Orange);
-                                bitmap.SetPixel(i, j + 3, Color.Orange);
-                                bitmap.SetPixel(i - 1, j, Color.Orange);
-                                bitmap.SetPixel(i - 2, j, Color.Orange);
-                                bitmap.SetPixel(i - 3, j, Color.Orange);
-                                bitmap.SetPixel(i + 1, j, Color.Orange);
-                                bitmap.SetPixel(i + 2, j, Color.Orange);
-                                bitmap.SetPixel(i + 3, j, Color.Orange);
-                            }
-                //打滑鼠點
-                for (int i = 0; i < bitmap.Width; i++)
-                    for (int j = 0; j < bitmap.Height; j++)
-                        if (i == x && j == y)
-                        {
-                            bitmap.SetPixel(i, j, Color.Blue);
-                            bitmap.SetPixel(i, j - 1, Color.Blue);
-                            bitmap.SetPixel(i, j - 2, Color.Blue);
-                            bitmap.SetPixel(i, j - 3, Color.Blue);
-                            bitmap.SetPixel(i, j + 1, Color.Blue);
-                            bitmap.SetPixel(i, j + 2, Color.Blue);
-                            bitmap.SetPixel(i, j + 3, Color.Blue);
-                            bitmap.SetPixel(i - 1, j, Color.Blue);
-                            bitmap.SetPixel(i - 2, j, Color.Blue);
-                            bitmap.SetPixel(i - 3, j, Color.Blue);
-                            bitmap.SetPixel(i + 1, j, Color.Blue);
-                            bitmap.SetPixel(i + 2, j, Color.Blue);
-                            bitmap.SetPixel(i + 3, j, Color.Blue);
-                        }
-                pictureBox1.Image = bitmap;
 
+                //關鍵點打點
+                if (inteInfoCounter != 0)
+                {
+                    p = new Pen(Color.Red);
+                    for (int c = 0; c < inteInfo.Length - 1; c++)
+                    {
+                        int i = inteInfo[c].x, j = inteInfo[c].y;
+                        if (inteInfo[c].isNotEmpty && i > 3 && i < bitmap.Width - 3 && j > 3 && j < bitmap.Height - 3)
+                        {
+                            g = Graphics.FromImage(grayImage);
+                            using (g)
+                            {
+                                //*畫十字
+                                g.DrawLine(p, i - 3, j, i + 3, j);
+                                g.DrawLine(p, i, j - 3, i, j + 3);//*/
+                                //畫走勢
+                                Point point1 = new Point(i, j);
+                                Point point2 = new Point(i + (int)(Math.Cos(inteInfo[c].sita) * inteInfo[c].gradientMagnitudes), j + (int)(Math.Cos(inteInfo[c].sita) * inteInfo[c].gradientMagnitudes));
+                                g.DrawLine(p, point1, point2);
+                            }
+                        }
+                    }
+                }
+
+                //打滑鼠點
+                if (x != 0 && y != 0)
+                {
+                    int i = x, j = y;
+                    p = new Pen(Color.Blue);
+                    g = Graphics.FromImage(grayImage);
+                    using (g)
+                    {
+                        //十字
+                        g.DrawLine(p, i - 3, j, i + 3, j);
+                        g.DrawLine(p, i, j - 3, i, j + 3);
+                        /*框框
+                        g.DrawLine(p, i - 3, j - 3, i + 3, j - 3);
+                        g.DrawLine(p, i - 3, j + 3, i + 3, j + 3);
+                        g.DrawLine(p, i - 3, j - 3, i - 3, j + 3);
+                        g.DrawLine(p, i + 3, j - 3, i + 3, j + 3);//*/
+                    }
+                }
+
+                pictureBox1.Invalidate();
             }
         }
     }
