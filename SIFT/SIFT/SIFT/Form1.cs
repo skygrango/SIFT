@@ -12,7 +12,7 @@ namespace SIFT
 {
     public partial class Form1 : Form
     {
-        Image myImage = SIFT.Properties.Resources.f09ef9a0_34d9_4a2e_b9f9_af2205705039_jpg_w300x300;
+        Image myImage = SIFT.Properties.Resources._910054042_m;
         Image grayImage;
         Bitmap bitmap, orignBitmap;
         System.Drawing.Imaging.PixelFormat format;
@@ -57,13 +57,12 @@ namespace SIFT
                     sum += fingerprint[i];
                 if (sum == 0)//避免全都是0
                     return;
-                for (int i = 0; i < 128; i++)
-                    fingerprint[i] /= sum;
                 //大於0.2者改成0.2為了尺度不變性
                 for (int i = 0; i < 128; i++)
                 {
+                    fingerprint[i] /= sum;
                     if (fingerprint[i] > 0.2)
-                    { 
+                    {
                         fingerprint[i] = 0.2;
                         hadrevised = true;
                     }
@@ -71,6 +70,8 @@ namespace SIFT
                 //如果有被修正則重新呼叫自己一次，避免無窮迴圈
                 if (hadrevised && times < 5)
                     normalize(times + 1);
+                else
+                    return;
             }
         }
 
@@ -553,11 +554,8 @@ namespace SIFT
                 inteInfo[c].gradientMagnitudes = maxGM / maxGMCounter;
                 inteInfo[c].sita = maxSita;
             }
-            /*
-            bitmap = new Bitmap(bitmap.Width, bitmap.Height, g);
-            g.Dispose();
-            pictureBox1.Image = bitmap;
-            */
+
+            refreshScreen(0, 0);
             label1.Text = "走勢";
         }
 
@@ -601,7 +599,7 @@ namespace SIFT
         private void button5_Click(object sender, EventArgs e)
         {
             //製作專屬指紋
-            for (int c = 0; c < inteInfo.Length - 1; c++)
+            for (int c = 0; c < inteInfo.Length - 1 && inteInfo[c].isNotEmpty; c++)
             {
                 int x = inteInfo[c].x, y = inteInfo[c].y;
                 int sita = inteInfo[c].sita;
@@ -624,6 +622,8 @@ namespace SIFT
                     }
                 }
                 inteInfo[c].normalize(0);
+                if (c > 98)
+                    ;
             }
             label1.Text = "指紋";
         }
@@ -710,13 +710,13 @@ namespace SIFT
                 refreshScreen(x, y);
             }
         }
-
         private void refreshScreen(int x, int y)
         {
             //重新更新圖片
             //重新讀圖
             int rightPoint = sizeOfw / 2;
             Pen p;
+            grayImage = bitmap.Clone(cloneRect, format);
             Graphics g = Graphics.FromImage(grayImage);
             pictureBox1.Image = grayImage;
             if (grayFinish)
@@ -742,7 +742,8 @@ namespace SIFT
                                 g.DrawLine(p, i, j - 3, i, j + 3);//*/
                                 //畫走勢
                                 Point point1 = new Point(i, j);
-                                Point point2 = new Point(i + (int)(Math.Cos(inteInfo[c].sita) * inteInfo[c].gradientMagnitudes), j + (int)(Math.Cos(inteInfo[c].sita) * inteInfo[c].gradientMagnitudes));
+                                double px = Math.Cos(inteInfo[c].sita) * inteInfo[c].gradientMagnitudes - 0.5, py = Math.Sin(inteInfo[c].sita) * inteInfo[c].gradientMagnitudes - 0.5;
+                                Point point2 = new Point(i + (int)px, j + (int)py);
                                 g.DrawLine(p, point1, point2);
                             }
                         }

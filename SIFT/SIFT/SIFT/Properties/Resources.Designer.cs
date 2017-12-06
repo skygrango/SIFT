@@ -73,9 +73,39 @@ namespace SIFT.Properties {
         /// <summary>
         ///   查詢類型 System.Drawing.Bitmap 的當地語系化資源。
         /// </summary>
+        internal static System.Drawing.Bitmap _910054042_m {
+            get {
+                object obj = ResourceManager.GetObject("_910054042_m", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   查詢類型 System.Drawing.Bitmap 的當地語系化資源。
+        /// </summary>
         internal static System.Drawing.Bitmap aaa {
             get {
                 object obj = ResourceManager.GetObject("aaa", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   查詢類型 System.Drawing.Bitmap 的當地語系化資源。
+        /// </summary>
+        internal static System.Drawing.Bitmap ARIB_COLOR_BAR_100 {
+            get {
+                object obj = ResourceManager.GetObject("ARIB_COLOR_BAR_100", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   查詢類型 System.Drawing.Bitmap 的當地語系化資源。
+        /// </summary>
+        internal static System.Drawing.Bitmap ARIB_COLOR_BAR_1000 {
+            get {
+                object obj = ResourceManager.GetObject("ARIB_COLOR_BAR_1000", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

@@ -16,3 +16,12 @@ D:\咪挺\GIT\SIFT\SIFT\SIFT\SIFT\obj\Debug\SIFT.csprojResolveAssemblyReference.
 D:\咪挺\GIT\SIFT\SIFT\SIFT\SIFT\obj\Debug\SIFT.Form1.resources
 D:\咪挺\GIT\SIFT\SIFT\SIFT\SIFT\obj\Debug\SIFT.Properties.Resources.resources
 D:\咪挺\GIT\SIFT\SIFT\SIFT\SIFT\obj\Debug\SIFT.csproj.GenerateResource.Cache
+D:\咪挺\NewGit\SIFT\SIFT\SIFT\SIFT\bin\Debug\SIFT.exe.config
+D:\咪挺\NewGit\SIFT\SIFT\SIFT\SIFT\obj\Debug\SIFT.exe
+D:\咪挺\NewGit\SIFT\SIFT\SIFT\SIFT\obj\Debug\SIFT.pdb
+D:\咪挺\NewGit\SIFT\SIFT\SIFT\SIFT\bin\Debug\SIFT.exe
+D:\咪挺\NewGit\SIFT\SIFT\SIFT\SIFT\bin\Debug\SIFT.pdb
+D:\咪挺\NewGit\SIFT\SIFT\SIFT\SIFT\obj\Debug\SIFT.csprojResolveAssemblyReference.cache
+D:\咪挺\NewGit\SIFT\SIFT\SIFT\SIFT\obj\Debug\SIFT.Form1.resources
+D:\咪挺\NewGit\SIFT\SIFT\SIFT\SIFT\obj\Debug\SIFT.Properties.Resources.resources
+D:\咪挺\NewGit\SIFT\SIFT\SIFT\SIFT\obj\Debug\SIFT.csproj.GenerateResource.Cache
